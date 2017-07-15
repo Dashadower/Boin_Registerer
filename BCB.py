@@ -297,6 +297,7 @@ class BoinWebHandler():
         "s_num":Student_ID,
         "name":Student_Name,
         "memo":memo}
+        print(payload)
         response = self.Session.post("https://boini.net/lecture.php",data=payload).content.decode()
         print(response)
         if"window.location='?club=index" in response:
