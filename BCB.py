@@ -4,9 +4,7 @@ from tkinter.constants import *
 from tkinter.messagebox import showinfo,showerror,showwarning
 from tkinter.messagebox import askyesno
 import tkinter.tix as tix
-import requests
-import bs4
-import ast
+import requests,bs4,ast,urllib
 from webbrowser import open as webopen
 # Some common data structures
 # Session(방과후학교, 동아리 등 구별): (session_type,session_id,session_opt)
@@ -125,7 +123,6 @@ class SeasonInfoScreen(Frame):
         response = self.requesthandler.GetClassList(self.SeasonInfo[1][1])
         if not "수강신청용" in response:
             showerror("","기기등록이 되지 않았거나 다른 학년을 선택했습니다.다른 기기에서 등록한지 1분이 지났나요?(request error)")
-            on_close()
         else:
             myMenu = Menu(self.master)
             myMenu.add_command(label="본인정보 등록",command=self.AddPersonalInfo)
@@ -162,7 +159,7 @@ class SeasonInfoScreen(Frame):
 
             for class_info in classes:
 
-                if class_increment == 2: print(class_info)
+                if class_increment == 2:print(class_info)
 
                 if int(class_info[5].split("/")[0]) >= int(class_info[5].split("/")[1]):
                     open_state = False
@@ -206,10 +203,10 @@ class SeasonInfoScreen(Frame):
                 showinfo("","학생정보 및 메모를 입력해주세요.")
             #Button(Register_window,text="등록",command=lambda:self.RegisterClass_handler(Class_Tuple,self.Student_Name.get(),self.Student_ID.get(),self.Memo.get())).grid(row=4,column=0,columnspan=2)
             else:
-                self.RegisterClass_handler(Class_Tuple, self.Student_Name.get(), self.Student_ID.get(), self.Memo.get())
+                self.RegisterClass_handler(Class_Tuple,self.Student_Name.get(),self.Student_ID.get(),self.Memo.get())
     def RegisterClass_handler(self,Class_Tuple,Name,ID,Memo):
         if Name and ID:
-            if askyesno("","%이름:%s\n학번:%s\n메모:%s\n이대로 강좌를 신청할까요?"%(Name,ID,Memo)):
+            if askyesno("","이대로 강좌를 신청할까요?"):
 
                 res = self.requesthandler.RegisterClass(self.Session_ID[1],Class_Tuple[1],Class_Tuple[0],ID,Name,Memo)
                 if res == 1:
@@ -301,7 +298,7 @@ class BoinWebHandler():
         "name":Student_Name,
         "memo":memo}
         response = self.Session.post("https://boini.net/lecture.php",data=payload).content.decode()
-
+        print(response)
         if"window.location='?club=index" in response:
             return 1
         else: return 0
