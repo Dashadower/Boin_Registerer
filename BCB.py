@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
-from tkinter import Label,Button,Frame,StringVar,Entry,Menu
+from tkinter import Label,Button,Frame,StringVar,Entry,Menu, IntVar
 from tkinter.constants import *
 from tkinter.messagebox import showinfo,showerror,showwarning
 from tkinter.messagebox import askyesno
-import tkinter.tix as tix
+import tkinter.tix as tix, datetime, time
 import requests,bs4,ast,urllib
 from webbrowser import open as webopen
 # Some common data structures
@@ -116,7 +116,7 @@ class SeasonInfoScreen(Frame):
 
         TopFrame_ = tix.ScrolledWindow(self,scrollbar=Y)
         TopFrame_.pack(expand=YES,fill=BOTH)
-        TopFrame = TopFrame_.window
+        self.TopFrame = TopFrame_.window
 
 
 
@@ -126,8 +126,12 @@ class SeasonInfoScreen(Frame):
         else:
             myMenu = Menu(self.master)
             myMenu.add_command(label="본인정보 등록",command=self.AddPersonalInfo)
+            myMenu.add_command(label="자동등록 설정",command=self.OnAutomate)
             self.Student_Name = StringVar()
             self.Student_ID = StringVar()
+            self.AutoRegisterTime = IntVar()
+            self.AutoRegisterInfo = StringVar()
+            self.AutoRegisterInput = StringVar()
             self.Memo = StringVar()
             self.master.config(menu=myMenu)
             soup = bs4.BeautifulSoup(response,"html.parser")
@@ -148,13 +152,14 @@ class SeasonInfoScreen(Frame):
             classes.pop(0)
             class_increment = 1
 
-            Label(TopFrame,text="순번").grid(row=0,column=0)
-            Label(TopFrame,text="학년").grid(row=0,column=1)
-            Label(TopFrame,text="[선택군] 강좌 이름").grid(row=0,column=2)
-            Label(TopFrame,text="담당교사").grid(row=0,column=3)
-            Label(TopFrame,text="신청/정원").grid(row=0,column=4)
-            Label(TopFrame,text="수강료").grid(row=0,column=5)
-            Label(TopFrame,text="상태").grid(row=0,column=6)
+            Label(self.TopFrame,text="순번").grid(row=0,column=0)
+            Label(self.TopFrame,text="학년").grid(row=0,column=1)
+            Label(self.TopFrame,text="[선택군] 강좌 이름").grid(row=0,column=2)
+            Label(self.TopFrame,text="담당교사").grid(row=0,column=3)
+            Label(self.TopFrame,text="신청/정원").grid(row=0,column=4)
+            Label(self.TopFrame,text="수강료").grid(row=0,column=5)
+            Label(self.TopFrame,text="상태").grid(row=0,column=6)
+            Label(self.TopFrame,text="자동신청").grid(row=0,column=7)
             jsvalue = []
 
             for class_info in classes:
@@ -164,14 +169,16 @@ class SeasonInfoScreen(Frame):
                 if int(class_info[5].split("/")[0]) >= int(class_info[5].split("/")[1]):
                     open_state = False
                 else: open_state = True
-                Label(TopFrame,text=class_info[1]).grid(row=class_increment,column=0)
-                Label(TopFrame,text=class_info[2]).grid(row=class_increment,column=1)
-                Label(TopFrame,text=class_info[3]+" ("+str(ast.literal_eval(class_info[0].split("bL")[1])[1] if class_info[0] != None else "None")+")").grid(row=class_increment,column=2)
-                Label(TopFrame,text=class_info[4]).grid(row=class_increment,column=3)
-                Label(TopFrame,text=class_info[5],fg="blue" if open_state else "red").grid(row=class_increment,column=4)
-                Label(TopFrame,text=class_info[6]).grid(row=class_increment,column=5)
+                Label(self.TopFrame,text=class_info[1]).grid(row=class_increment,column=0)
+                Label(self.TopFrame,text=class_info[2]).grid(row=class_increment,column=1)
+                Label(self.TopFrame,text=class_info[3]+" ("+str(ast.literal_eval(class_info[0].split("bL")[1])[1] if class_info[0] != None else "None")+")").grid(row=class_increment,column=2)
+                Label(self.TopFrame,text=class_info[4]).grid(row=class_increment,column=3)
+                Label(self.TopFrame,text=class_info[5],fg="blue" if open_state else "red").grid(row=class_increment,column=4)
+                Label(self.TopFrame,text=class_info[6]).grid(row=class_increment,column=5)
                 jsvalue.append((ast.literal_eval(class_info[0].split("bL")[1]) if class_info[0] else None,class_increment-1))
-                Button(TopFrame,text="가능" if open_state else "마감",fg="blue" if open_state else "red",state=NORMAL if open_state else DISABLED,command=lambda class_increment=class_increment:self.RegisterClass(jsvalue[class_increment-1])).grid(row=class_increment,column=6)
+                Button(self.TopFrame,text="바로신청" if open_state else "마감",fg="blue" if open_state else "red",state=NORMAL if open_state else DISABLED,command=lambda class_increment=class_increment:self.RegisterClass(jsvalue[class_increment-1])).grid(row=class_increment,column=6)
+                Button(self.TopFrame, text="자동신청" if open_state else "마감", fg="blue" if open_state else "red", state=NORMAL if open_state else DISABLED,
+                       command=lambda class_increment=class_increment: self.AutoRegisterClass(jsvalue[class_increment - 1])).grid(row=class_increment, column=7)
                 class_increment += 1
 
             showwarning("","주의! 이미 신청 성공한 강좌를 한번더 신청을 시도하면 돌이킬수 없는 오류가 일어날수가 있습니다. 자신이 강좌 명단에 포함되어 있는지 확인한 다음에 신청 다시 해주세요.")
@@ -194,6 +201,52 @@ class SeasonInfoScreen(Frame):
         Register_window.columnconfigure(0,weight=1)
         Label(Register_window,text="이름과 학번은 어떻게 치든 본인걸로 등록됩니다.",foreground="red").grid(row=3,column=0,columnspan=2)
         Button(Register_window,text="닫기",command=lambda:Register_window.destroy()).grid(row=4,column=0,columnspan=2)
+
+    def OnAutomate(self):
+        Register_window = tix.Toplevel(self.master)
+        Register_window.grab_set()
+        Register_window.resizable(0, 0)
+        Label(Register_window,text="현재시간: %d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute,datetime.datetime.now().second)).grid(row=0,column=0,columnspan=2)
+        Label(Register_window,text="등록시작을 원하는 시간을 24시간:분:초 형식으로 입력해주세요\n(예:8시부터 신청을 원하면 20:0:0). 이 사간부터 프로그램은 될때까지 등록을 계속 합니다.").grid(row=1,column=0,columnspan=2)
+        Label(Register_window, text="시간(24시간 형식):분:초").grid(row=2, column=0)
+        timeentry = Entry(Register_window,textvariable=self.AutoRegisterInput)
+        timeentry.grid(row=2, column=1)
+        Button(Register_window, text="설정하기", command=self.OnAutomateCallBack).grid(row=3, column=0, columnspan=2)
+        Label(Register_window, textvariable=self.AutoRegisterInfo).grid(row=4,column=0,columnspan=2)
+        Button(Register_window, text="닫기", command=lambda: Register_window.destroy()).grid(row=5, column=0, columnspan=2)
+    def OnAutomateCallBack(self):
+        self.master.update_idletasks()
+        hourvar, minutevar, secondvar = IntVar(), IntVar(), IntVar()
+        data = self.AutoRegisterInput.get()
+        try:
+            hour, minute, second = data.split(":")
+        except ValueError:
+            self.AutoRegisterInfo.set("올바르지 않은 시간 형식입니다.")
+        else:
+            if hour.isdigit() and minute.isdigit() and second.isdigit():
+                newtime = datetime.datetime.now()
+                newtime = newtime.replace(hour=int(hour),minute=int(minute),second=int(second))
+
+                offset = newtime - datetime.datetime.now()
+                offhours,r1 = divmod(offset.seconds,3600)
+                offminutes, offseconds = divmod(r1,60)
+                self.AutoRegisterInfo.set("시작시간: %s시 %s분 %s초 (%d시 %d분 %d초 후) 으로 설정되었습니다."%(hour,minute,second,offhours,offminutes,offseconds))
+                self.AutoRegisterTime.set(time.mktime(newtime.timetuple()))
+    def AutoRegisterClass(self,Class_Tuple):
+        if Class_Tuple[0] == None:
+            showerror("","해당 학년이 아닙니다")
+        else:
+            if not self.Student_Name.get():
+                self.AddPersonalInfo()
+                showinfo("","학생정보 및 메모를 입력해주세요.")
+            #Button(Register_window,text="등록",command=lambda:self.RegisterClass_handler(Class_Tuple,self.Student_Name.get(),self.Student_ID.get(),self.Memo.get())).grid(row=4,column=0,columnspan=2)
+            else:
+                if not self.AutoRegisterTime.get():
+                    self.OnAutomate()
+                    showinfo("","신청시간을 설정해주세요.")
+                else:
+                    print("reached",self.AutoRegisterTime.get())
+                    #self.RegisterClass_handler(Class_Tuple,self.Student_Name.get(),self.Student_ID.get(),self.Memo.get())
     def RegisterClass(self,Class_Tuple):
         if Class_Tuple[0] == None:
             showerror("","해당 학년이 아닙니다")
