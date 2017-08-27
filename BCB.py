@@ -132,6 +132,7 @@ class SeasonInfoScreen(Frame):
             self.AutoRegisterTime = IntVar()
             self.AutoRegisterInfo = StringVar()
             self.AutoRegisterInput = StringVar()
+            #self.AutoRegisterList = {}
             self.Memo = StringVar()
             self.master.config(menu=myMenu)
             soup = bs4.BeautifulSoup(response,"html.parser")
@@ -246,7 +247,11 @@ class SeasonInfoScreen(Frame):
                     showinfo("","신청시간을 설정해주세요.")
                 else:
                     print("reached",self.AutoRegisterTime.get())
-                    #self.RegisterClass_handler(Class_Tuple,self.Student_Name.get(),self.Student_ID.get(),self.Memo.get())
+                    self.AutoRegisterClass_handler(Class_Tuple)
+    def AutoRegisterClass_handler(self,Class_Tuple):
+        Waitwindow = tix.Toplevel()
+        Waitwindow.title("자동 신청")
+        Label(Waitwindow,)
     def RegisterClass(self,Class_Tuple):
         if Class_Tuple[0] == None:
             showerror("","해당 학년이 아닙니다")
