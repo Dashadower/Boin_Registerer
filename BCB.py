@@ -88,12 +88,24 @@ class SeasonScreen(Frame):
             Button(self,text=items[0],command=lambda items=items:self.SelectLecture(items)).grid(row=list_increment,column=0)
 
             list_increment += 1
-
+        Button(self,text="Debug",command=lambda: DebugWindow(self.master,self.requesthandler)).grid(row=list_increment,column=0)
     def SelectLecture(self,lecture_info):
         self.requesthandler.RegisterPC(lecture_info[1][1])
         SeasonInfoScreen(self.master,self.requesthandler,lecture_info)
 
 
+class DebugWindow(Frame):
+    def __init__(self, master,requesthandler):
+        clearscreen()
+        Frame.__init__(self,master)
+        self.pack(expand=YES,fill=BOTH)
+        self.master = master
+        self.requesthander = requesthandler
+        self.PyCommand = StringVar()
+        self.PyCommand.set("Custom PyCommand")
+        Button(self, text="back", command=lambda: SeasonScreen(self.master, self.requesthandler)).grid(row=0,column=1)
+        Entry(self,textvariable=self.PyCommand).grid(row=1,column=0)
+        Button(self,text="Run",command= lambda: exec(self.PyCommand.get())).grid(row=1,column=1)
 class SeasonInfoScreen(Frame):
     def __init__(self, master,requesthandler,SeasonInfo):
         clearscreen()
@@ -212,10 +224,11 @@ class SeasonInfoScreen(Frame):
         Label(Register_window, text="시간(24시간 형식):분:초").grid(row=2, column=0)
         timeentry = Entry(Register_window,textvariable=self.AutoRegisterInput)
         timeentry.grid(row=2, column=1)
-        Button(Register_window, text="설정하기", command=self.OnAutomateCallBack).grid(row=3, column=0, columnspan=2)
+        timeentry.bind("<KeyRelease>",self.OnAutomateCallBack)
+        #Button(Register_window, text="설정하기", command= lambda: self.OnAutomateCallBack("event")).grid(row=3, column=0, columnspan=2)
         Label(Register_window, textvariable=self.AutoRegisterInfo).grid(row=4,column=0,columnspan=2)
         Button(Register_window, text="닫기", command=lambda: Register_window.destroy()).grid(row=5, column=0, columnspan=2)
-    def OnAutomateCallBack(self):
+    def OnAutomateCallBack(self,event):
         self.master.update_idletasks()
         hourvar, minutevar, secondvar = IntVar(), IntVar(), IntVar()
         data = self.AutoRegisterInput.get()
