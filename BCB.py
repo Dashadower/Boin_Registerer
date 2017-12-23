@@ -65,7 +65,7 @@ class LoginScreen(Frame):
         Button(self,text="로그인",command=self.Login_Handler).grid(row=2,column=1)
         Button(self,text="보인아이",command=lambda:webopen("https://boini.net")).grid(row=2,column=0)
 
-        #showinfo("","로그인하기 전\n1.브라우저에도 기기등록이 되어있는지 확인해주세요(동시에 기기등록이 되면 안됩니다)\n2.로그인을 하면 1분후에 기기등록 해제가 되고, 그때가 되서야 브라우저에서 접속이 가능해집니다.\n\n위 내용을 숙지하시기 바랍니다.")
+        self.master.after_idle(lambda: showinfo("","로그인하기 전\n1.브라우저에도 기기등록이 되어있는지 확인해주세요(동시에 기기등록이 안됩니다)\n2.로그인을 하면 최소 1분이 지나 기기등록 해제가 되고, 그때가 되서야 브라우저에서 접속이 가능해집니다.\n\n위 내용을 숙지하시기 바랍니다."))
     def Login_Handler(self):
         if self.ID.get() and self.PW.get():
             if self.requesthandler.Login(self.ID.get(),self.PW.get()):
@@ -194,7 +194,7 @@ class SeasonInfoScreen(Frame):
                        command=lambda class_increment=class_increment: self.AutoRegisterClass(jsvalue[class_increment - 1])).grid(row=class_increment, column=7)
                 class_increment += 1
 
-            showwarning("","주의! 이미 신청 성공한 강좌를 한번더 신청을 시도하면 돌이킬수 없는 오류가 일어날수가 있습니다. 자신이 강좌 명단에 포함되어 있는지 확인한 다음에 신청 다시 해주세요.")
+            showwarning("","주의! 신청에 성공했다고 하여도 프로그램 종료 후, 브라우저에서 보인아이에 접속하여 정상적으로 신청되었는지 꼭 확인해주세요.")
     def nothing(self):
         pass
 
@@ -219,7 +219,9 @@ class SeasonInfoScreen(Frame):
         Register_window = tix.Toplevel(self.master)
         Register_window.grab_set()
         Register_window.resizable(0, 0)
-        Label(Register_window,text="현재시간: %d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute,datetime.datetime.now().second)).grid(row=0,column=0,columnspan=2)
+        clocklabel =  Label(Register_window,text="현재시간: %d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute,datetime.datetime.now().second))
+        clocklabel.grid(row=0,column=0,columnspan=2)
+        clocklabel.after(500, lambda: self.UpdateOnAutomateClock(clocklabel))
         Label(Register_window,text="등록시작을 원하는 시간을 24시간:분:초 형식으로 입력해주세요\n(예:8시부터 신청을 원하면 20:0:0). 이 사간부터 프로그램은 될때까지 등록을 계속 합니다.").grid(row=1,column=0,columnspan=2)
         Label(Register_window, text="시간(24시간 형식):분:초").grid(row=2, column=0)
         timeentry = Entry(Register_window,textvariable=self.AutoRegisterInput)
@@ -228,6 +230,12 @@ class SeasonInfoScreen(Frame):
         #Button(Register_window, text="설정하기", command= lambda: self.OnAutomateCallBack("event")).grid(row=3, column=0, columnspan=2)
         Label(Register_window, textvariable=self.AutoRegisterInfo).grid(row=4,column=0,columnspan=2)
         Button(Register_window, text="닫기", command=lambda: Register_window.destroy()).grid(row=5, column=0, columnspan=2)
+
+    def UpdateOnAutomateClock(self,labelwidget):
+        if labelwidget.winfo_exists():
+            labelwidget.config(text="현재시간: %d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute,datetime.datetime.now().second))
+            self.master.update()
+            labelwidget.after(500, lambda: self.UpdateOnAutomateClock(labelwidget))
     def OnAutomateCallBack(self,event):
         self.master.update_idletasks()
         hourvar, minutevar, secondvar = IntVar(), IntVar(), IntVar()
@@ -244,8 +252,10 @@ class SeasonInfoScreen(Frame):
                 offset = newtime - datetime.datetime.now()
                 offhours,r1 = divmod(offset.seconds,3600)
                 offminutes, offseconds = divmod(r1,60)
-                self.AutoRegisterInfo.set("시작시간: %s시 %s분 %s초 (%d시 %d분 %d초 후) 으로 설정되었습니다."%(hour,minute,second,offhours,offminutes,offseconds))
+                self.AutoRegisterInfo.set("시작시간: %s시 %s분 %s초 (%d시간 %d분 %d초 후) 으로 설정되었습니다."%(hour,minute,second,offhours,offminutes,offseconds))
                 self.AutoRegisterTime.set(time.mktime(newtime.timetuple()))
+            else:
+                self.AutoRegisterInfo.set("올바르지 않은 시간 형식입니다.")
     def AutoRegisterClass(self,Class_Tuple):
         if Class_Tuple[0] == None:
             showerror("","해당 학년이 아닙니다")
