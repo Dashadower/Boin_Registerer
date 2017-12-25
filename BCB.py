@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-from tkinter import Label,Button,Frame,StringVar,Entry,Menu, IntVar
+from tkinter import Label,Button,Frame,StringVar,Entry,Menu,IntVar,Text,Scrollbar
 from tkinter.constants import *
 from tkinter.messagebox import showinfo,showerror,showwarning
 from tkinter.messagebox import askyesno
@@ -65,7 +65,7 @@ class LoginScreen(Frame):
         Button(self,text="로그인",command=self.Login_Handler).grid(row=2,column=1)
         Button(self,text="보인아이",command=lambda:webopen("https://boini.net")).grid(row=2,column=0)
 
-        self.master.after_idle(lambda: showinfo("","로그인하기 전\n1.브라우저에도 기기등록이 되어있는지 확인해주세요(동시에 기기등록이 안됩니다)\n2.로그인을 하면 최소 1분이 지나 기기등록 해제가 되고, 그때가 되서야 브라우저에서 접속이 가능해집니다.\n\n위 내용을 숙지하시기 바랍니다."))
+        #self.master.after_idle(lambda: showinfo("","로그인하기 전\n1.브라우저에도 기기등록이 되어있는지 확인해주세요(동시에 기기등록이 안됩니다)\n2.로그인을 하면 최소 1분이 지나 기기등록 해제가 되고, 그때가 되서야 브라우저에서 접속이 가능해집니다.\n\n위 내용을 숙지하시기 바랍니다."))
     def Login_Handler(self):
         if self.ID.get() and self.PW.get():
             if self.requesthandler.Login(self.ID.get(),self.PW.get()):
@@ -100,7 +100,7 @@ class DebugWindow(Frame):
         Frame.__init__(self,master)
         self.pack(expand=YES,fill=BOTH)
         self.master = master
-        self.requesthander = requesthandler
+        self.requesthandler = requesthandler
         self.PyCommand = StringVar()
         self.PyCommand.set("Custom PyCommand")
         Button(self, text="back", command=lambda: SeasonScreen(self.master, self.requesthandler)).grid(row=0,column=1)
@@ -114,8 +114,13 @@ class SeasonInfoScreen(Frame):
         self.master = master
         self.master.protocol("WM_DELETE_WINDOW",on_close)
         self.requesthandler = requesthandler
-        self.SeasonInfo = SeasonInfo
-        self.Session_ID = self.SeasonInfo[1]
+        self.SeasonInfo = SeasonInfo  # (seasonname, season info tuple)
+        self.Session_ID = self.SeasonInfo[1]  # season info tuple
+        self.checkincrement = IntVar()
+        self.checkincrement.set(120)
+        self.devicecheckcount = IntVar()
+        self.devicecheckcount.set(0)
+        self.AutoRegisterEnabled = False
         OptionFrame = Frame(self)
         OptionFrame.pack(side=TOP,fill=X)
         Button(OptionFrame,text="뒤로",command=lambda:SeasonScreen(self.master,self.requesthandler)).pack(side=RIGHT)
@@ -134,7 +139,7 @@ class SeasonInfoScreen(Frame):
 
         response = self.requesthandler.GetClassList(self.SeasonInfo[1][1])
         if not "수강신청용" in response:
-            showerror("","기기등록이 되지 않았거나 다른 학년을 선택했습니다.다른 기기에서 등록한지 1분이 지났나요?(request error)")
+            showerror("","기기등록에 실패했습니다. 이는 주로 기기등록을 한지 1분도 안지나고 다시 기기등록을 시도하면 발생합니다. 1분 경과후 재시도해주세요.(request error)")
         else:
             myMenu = Menu(self.master)
             myMenu.add_command(label="본인정보 등록",command=self.AddPersonalInfo)
@@ -191,10 +196,10 @@ class SeasonInfoScreen(Frame):
                 jsvalue.append((ast.literal_eval(class_info[0].split("bL")[1]) if class_info[0] else None,class_increment-1))
                 Button(self.TopFrame,text="바로신청" if open_state else "마감",fg="blue" if open_state else "red",state=NORMAL if open_state else DISABLED,command=lambda class_increment=class_increment:self.RegisterClass(jsvalue[class_increment-1])).grid(row=class_increment,column=6)
                 Button(self.TopFrame, text="자동신청" if open_state else "마감", fg="blue" if open_state else "red", state=NORMAL if open_state else DISABLED,
-                       command=lambda class_increment=class_increment: self.AutoRegisterClass(jsvalue[class_increment - 1])).grid(row=class_increment, column=7)
+                       command=lambda class_increment=class_increment: self.AutoRegisterClass(jsvalue[class_increment - 1],classes[class_increment-1])).grid(row=class_increment, column=7)
                 class_increment += 1
 
-            showwarning("","주의! 신청에 성공했다고 하여도 프로그램 종료 후, 브라우저에서 보인아이에 접속하여 정상적으로 신청되었는지 꼭 확인해주세요.")
+            showwarning("","신청에 성공했다고 하여도 프로그램 종료 후, 브라우저에서 보인아이에 접속하여 정상적으로 신청되었는지 꼭 확인해주세요.")
     def nothing(self):
         pass
 
@@ -233,7 +238,7 @@ class SeasonInfoScreen(Frame):
 
     def UpdateOnAutomateClock(self,labelwidget):
         if labelwidget.winfo_exists():
-            labelwidget.config(text="현재시간: %d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute,datetime.datetime.now().second))
+            labelwidget.config(text="%d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute,datetime.datetime.now().second))
             self.master.update()
             labelwidget.after(500, lambda: self.UpdateOnAutomateClock(labelwidget))
     def OnAutomateCallBack(self,event):
@@ -256,7 +261,7 @@ class SeasonInfoScreen(Frame):
                 self.AutoRegisterTime.set(time.mktime(newtime.timetuple()))
             else:
                 self.AutoRegisterInfo.set("올바르지 않은 시간 형식입니다.")
-    def AutoRegisterClass(self,Class_Tuple):
+    def AutoRegisterClass(self,Class_Tuple,class_info):
         if Class_Tuple[0] == None:
             showerror("","해당 학년이 아닙니다")
         else:
@@ -269,12 +274,104 @@ class SeasonInfoScreen(Frame):
                     self.OnAutomate()
                     showinfo("","신청시간을 설정해주세요.")
                 else:
-                    print("reached",self.AutoRegisterTime.get())
-                    self.AutoRegisterClass_handler(Class_Tuple)
-    def AutoRegisterClass_handler(self,Class_Tuple):
+                    if self.AutoRegisterEnabled:
+                        showinfo("","자동등록은 현재 한가지 강좌만 지원됩니다.")
+                    else:
+                        self.AutoRegisterClass_handler(Class_Tuple,class_info)
+
+    def CheckAutoRegister(self,mainwindow, statuslabel, infotext, ctuple):
+        ctime = time.mktime(time.localtime(time.time()))
+        if mainwindow.winfo_exists():
+            if ctime >= self.AutoRegisterTime.get():
+                statuslabel.config(text="신청중")
+                infotext.config(state=NORMAL)
+                infotext.insert(END, "신청 시도중...\n")
+                infotext.see(END)
+                infotext.config(state=DISABLED)
+                res = self.requesthandler.RegisterClass(self.Session_ID[1], ctuple[1], ctuple[0], self.Student_ID.get(),self.Student_Name.get(),self.Memo.get())
+                if not res:
+                    mainwindow.focus_force()
+                    statuslabel.config(text="신청완료",fg="green")
+                    infotext.config(state=NORMAL)
+                    infotext.insert(END, "신청이 완료되었습니다. 브라우저에서 보인아이를 확인해주세요\n")
+                    infotext.see(END)
+                    infotext.config(state=DISABLED)
+                else:
+                    mainwindow.focus_force()
+                    statuslabel.config(text="신청실패",fg="red")
+                    infotext.config(state=NORMAL)
+                    infotext.insert(END, "신청에 실패했습니다. 바로신청을 통해 다시 신청을 시도해보거나, 브라우저를 통해 접속해주세요. (오류 내용 첨부)\n")
+                    infotext.insert(END,res+"\n")
+                    infotext.see(END)
+                    infotext.config(state=DISABLED)
+            else:
+                if self.checkincrement.get() == 0:
+                    infotext.config(state=NORMAL)
+                    infotext.insert(END, "기기 등록상태 확인중(%d)..."%(self.devicecheckcount.get()))
+                    self.devicecheckcount.set(self.devicecheckcount.get()+1)
+                    infotext.see(END)
+                    infotext.config(state=DISABLED)
+                    info = self.requesthandler.GetClassList(self.Session_ID[1])
+                    if "기기등록이 필요합니다" in info:
+                        infotext.config(state=NORMAL)
+                        infotext.insert(END, "만료됨\n")
+                        infotext.insert(END, "기기 재등록중...")
+                        infotext.see(END)
+                        infotext.config(state=DISABLED)
+                        self.requesthandler.RegisterPC(self.SeasonInfo[0])
+                        infotext.config(state=NORMAL)
+                        infotext.insert(END, "완료\n")
+                        infotext.see(END)
+                        infotext.config(state=DISABLED)
+                    else:
+                        infotext.config(state=NORMAL)
+                        infotext.insert(END, "정상\n")
+                        infotext.see(END)
+                        infotext.config(state=DISABLED)
+                    self.checkincrement.set(120)
+                else:
+                    self.checkincrement.set(self.checkincrement.get()-1)
+                statuslabel.after(500, lambda: self.CheckAutoRegister(mainwindow,statuslabel,infotext,ctuple))
+
+    def OnAutoWindowClose(self,window):
+        self.AutoRegisterEnabled = False
+        self.devicecheckcount.set(0)
+        self.checkincrement.set(120)
+        window.destroy()
+    def AutoRegisterClass_handler(self,Class_Tuple,Class_Info):
         Waitwindow = tix.Toplevel()
-        Waitwindow.title("자동 신청")
-        Label(Waitwindow,)
+        Waitwindow.title("자동 신청 - %s"%(Class_Info[3]))
+        Waitwindow.resizable(0,0)
+        self.AutoRegisterEnabled = True
+        Waitwindow.protocol("WM_DELETE_WINDOW",lambda:self.OnAutoWindowClose(Waitwindow))
+        Label(Waitwindow,text="강좌이름").grid(row=0,column=0)
+        Label(Waitwindow,text=Class_Info[3]).grid(row=0,column=1)
+        Label(Waitwindow,text="현재시간").grid(row=1,column=0)
+        literal = "%d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute, datetime.datetime.now().second)
+        clocklabel = Label(Waitwindow, text=literal)
+        clocklabel.grid(row=1, column=1)
+        clocklabel.after(500, lambda: self.UpdateOnAutomateClock(clocklabel))
+        Label(Waitwindow, text="자동신청 시간").grid(row=2,column=0)
+        Label(Waitwindow, text="%s"%(time.strftime("%H:%M:%S",time.localtime(self.AutoRegisterTime.get())))).grid(row=2, column=1)
+        Label(Waitwindow, text="상태").grid(row=3, column=0)
+        statuslabel = Label(Waitwindow,text="대기중",fg="green")
+        statuslabel.grid(row=3,column=1)
+        Label(Waitwindow, text="기기등록 확인").grid(row=4,column=0)
+        Label(Waitwindow, textvariable=self.checkincrement).grid(row=4,column=1)
+        textframe = Frame(Waitwindow)
+        textframe.grid(row=5,rowspan=3,column=0,columnspan=2)
+
+        infotext = Text(textframe, borderwidth=1, relief=SUNKEN)
+        infotext.pack(side=LEFT,expand=YES,fill=BOTH)
+        infotext.insert(END, "자동신청이 이 강좌에 한해 활성화되었습니다. 취소하려면 이 창을 끄면 됩니다.\n")
+        infotext.insert(END, str(Class_Tuple)+"\n")
+        infotext.config(state=DISABLED)
+
+        textscroll = Scrollbar(textframe,command=infotext.yview)
+        textscroll.pack(side=RIGHT,fill=Y)
+        infotext.config(yscrollcommand=textscroll.set)
+        self.devicecheckcount.set(0)
+        root.after(500,lambda: self.CheckAutoRegister(Waitwindow,statuslabel,infotext, Class_Tuple))
     def RegisterClass(self,Class_Tuple):
         if Class_Tuple[0] == None:
             showerror("","해당 학년이 아닙니다")
@@ -290,11 +387,11 @@ class SeasonInfoScreen(Frame):
             if askyesno("","이대로 강좌를 신청할까요?"):
 
                 res = self.requesthandler.RegisterClass(self.Session_ID[1],Class_Tuple[1],Class_Tuple[0],ID,Name,Memo)
-                if res == 1:
+                if not res:
                     showinfo("","등록이 완료되었습니다.혹시 모르니 보인아이 홈페이지에서 등록이 되어있는지 한번 더 확인해주세요.")
 
                 else:
-                    showinfo("","등록을 실패했습니다. 혹시 모르니 보인아이 홈페이지에서 등록이 되어있는지 확인해주세요.")
+                    showinfo("","등록을 실패했습니다. 혹시 모르니 보인아이 홈페이지에서 등록이 되어있는지 확인해주세요.\n오류내용:\n"+str(res))
         else:
             showwarning("","이름,학번를 입력해주세요")
 
@@ -378,12 +475,11 @@ class BoinWebHandler():
         "s_num":Student_ID,
         "name":Student_Name,
         "memo":memo}
-        print(payload)
         response = self.Session.post("https://boini.net/lecture.php",data=payload).content.decode()
-        print(response)
         if"window.location='?club=index" in response:
-            return 1
-        else: return 0
+            return 0
+        else:
+            return response
 
 
 ################################################################################
@@ -395,7 +491,8 @@ def on_close():
     if askyesno("","종료전에 기기 등록해제작업 및 로그아웃을 하시겠습니까?"):
         res = MyRequestHandler.UnRegisterPC()
         if res != 0:
-            showerror("",res)
+            if askyesno("",str(res)+"\n강제종료 하시겠습니까?"):
+                root.destroy()
         else:
             showinfo("","기기등록이 해제되었습니다.")
 
@@ -403,9 +500,17 @@ def on_close():
             showinfo("","로그아웃되었습니다.")
 
             root.destroy()
+def change_title1():
+    root.title("누구보다 빠르게")
+    root.after(2000, change_title2)
+def change_title2():
+    root.title("난 남들과는 다르게")
+    root.after(2000, change_title1)
 if __name__ == "__main__":
     root = tix.Tk()
     root.resizable(0,0)
+    root.title("방과후등록을 편리하게~")
+    root.after(1000, change_title1)
     root.maxsize(root.winfo_screenwidth(),root.winfo_screenheight()-150)
     MyRequestHandler = BoinWebHandler()
 
