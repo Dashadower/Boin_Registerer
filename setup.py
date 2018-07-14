@@ -7,5 +7,5 @@ setup(
     name = "BCB",
     version = "1.0",
     options = {"build_exe":build_exe_options},
-    description = "Boini Class Viewer",
+    description = "Boini Class Bot",
     executables = [Executable("BCB.py", base = "Win32GUI")])
