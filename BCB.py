@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-from tkinter import Label,Button,Frame,StringVar,Entry,Menu,IntVar,Text,Scrollbar
+from tkinter import Label,Button,Frame,StringVar,Entry,Menu,IntVar,DoubleVar, Text,Scrollbar, Scale
 from tkinter.constants import *
 from tkinter.messagebox import showinfo,showerror,showwarning
 from tkinter.messagebox import askyesno
@@ -64,7 +64,7 @@ class LoginScreen(Frame):
         Entry(self,textvariable=self.PW,show="*").grid(row=1,column=1)
         Button(self,text="로그인",command=self.Login_Handler).grid(row=2,column=1)
         Button(self,text="보인아이",command=lambda:webopen("https://boini.net")).grid(row=2,column=0)
-
+        #Label(self, text="제작자: 보인고 전우회").grid(row=3, column=0, columnspan=2)
         #self.master.after_idle(lambda: showinfo("","로그인하기 전\n1.브라우저에도 기기등록이 되어있는지 확인해주세요(동시에 기기등록이 안됩니다)\n2.로그인을 하면 최소 1분이 지나 기기등록 해제가 되고, 그때가 되서야 브라우저에서 접속이 가능해집니다.\n\n위 내용을 숙지하시기 바랍니다."))
     def Login_Handler(self):
         if self.ID.get() and self.PW.get():
@@ -88,12 +88,22 @@ class SeasonScreen(Frame):
             Button(self,text=items[0],command=lambda items=items:self.SelectLecture(items)).grid(row=list_increment,column=0)
 
             list_increment += 1
-        Button(self,text="Debug",command=lambda: DebugWindow(self.master,self.requesthandler)).grid(row=list_increment,column=0)
+
+        Button(self, text="사용법", fg="yellow", bg="black" ,command=lambda: ShowTutorial()).grid(row=list_increment, column=0)
+        Button(self,text="Debug",command=lambda: DebugWindow(self.master,self.requesthandler)).grid(row=list_increment+1,column=0)
+
     def SelectLecture(self,lecture_info):
         self.requesthandler.RegisterPC(lecture_info[1][1])
         SeasonInfoScreen(self.master,self.requesthandler,lecture_info)
 
-
+def ShowTutorial():
+    showinfo("사용법", """
+이 프로그램은 여러분들의 용이한 방과후,동아리, 등의 신청을 위해 개발했습니다.
+현재 수동신청과 자동신청 두가지가 있습니다.
+수동신청은 본인이 직접 클릭해서 신청하는 것이고, 자동신청은 일정한 시간에 컴퓨터가 자동으로 신청합니다(현재 한가지 강좌만 지원가능)
+방과후학교 목록에 들어간 후, 상단에 있는 "본인정보 등록"을 눌러 이름과 학번을 입력하신 후, 자동신청을 사용하실 분들은 옆에 있는
+"자동등록 설정"을 눌러 신청을 원하는 시간을 입력한 후, 강좌의 목록중 희망하시는 강좌의 "바로신청" 또는 자동신청을 누르시면 됩니다.
+    """)
 class DebugWindow(Frame):
     def __init__(self, master,requesthandler):
         clearscreen()
@@ -105,7 +115,7 @@ class DebugWindow(Frame):
         self.PyCommand.set("Custom PyCommand")
         Button(self, text="back", command=lambda: SeasonScreen(self.master, self.requesthandler)).grid(row=0,column=1)
         Entry(self,textvariable=self.PyCommand).grid(row=1,column=0)
-        Button(self,text="Run",command= lambda: exec(self.PyCommand.get())).grid(row=1,column=1)
+        Button(self,text="Run",command=lambda: exec(self.PyCommand.get())).grid(row=1,column=1)
 class SeasonInfoScreen(Frame):
     def __init__(self, master,requesthandler,SeasonInfo):
         clearscreen()
@@ -121,6 +131,8 @@ class SeasonInfoScreen(Frame):
         self.devicecheckcount = IntVar()
         self.devicecheckcount.set(0)
         self.AutoRegisterEnabled = False
+        self.ServerTimeOffset = datetime.timedelta(0,0,0)
+        self.RequestLatency = DoubleVar()
         OptionFrame = Frame(self)
         OptionFrame.pack(side=TOP,fill=X)
         Button(OptionFrame,text="뒤로",command=lambda:SeasonScreen(self.master,self.requesthandler)).pack(side=RIGHT)
@@ -144,6 +156,7 @@ class SeasonInfoScreen(Frame):
             myMenu = Menu(self.master)
             myMenu.add_command(label="본인정보 등록",command=self.AddPersonalInfo)
             myMenu.add_command(label="자동등록 설정",command=self.OnAutomate)
+            myMenu.add_command(labe="존나 큰 시계보기",command=self.ShowClock)
             self.Student_Name = StringVar()
             self.Student_ID = StringVar()
             self.AutoRegisterTime = IntVar()
@@ -172,11 +185,11 @@ class SeasonInfoScreen(Frame):
 
             Label(self.TopFrame,text="순번").grid(row=0,column=0)
             Label(self.TopFrame,text="학년").grid(row=0,column=1)
-            Label(self.TopFrame,text="[선택군] 강좌 이름").grid(row=0,column=2)
+            Label(self.TopFrame,text="[선택군] 강좌 이름(내부 강좌 코드)").grid(row=0,column=2)
             Label(self.TopFrame,text="담당교사").grid(row=0,column=3)
             Label(self.TopFrame,text="신청/정원").grid(row=0,column=4)
             Label(self.TopFrame,text="수강료").grid(row=0,column=5)
-            Label(self.TopFrame,text="상태").grid(row=0,column=6)
+            Label(self.TopFrame,text="바로신청").grid(row=0,column=6)
             Label(self.TopFrame,text="자동신청").grid(row=0,column=7)
             jsvalue = []
 
@@ -203,6 +216,24 @@ class SeasonInfoScreen(Frame):
     def nothing(self):
         pass
 
+    def ShowClock(self):
+        self.SetServerTimeOffset()
+        clockwindow = tix.Toplevel()
+
+        clockwindow.resizable(0,0)
+        tix.Label(clockwindow, text="현재 보인아이 시간").pack()
+        clocklabel = Label(clockwindow, text="00:00:00", font=("TkDefaultFont", 50, "bold"))
+        clocklabel.pack(expand=YES, fill=BOTH)
+        clockwindow.update_idletasks()
+        fontscale = Scale(clockwindow,label="글자크기",from_=10, to=200, orient=HORIZONTAL, resolution=10)
+        fontscale.pack(fill=Y,anchor=S)
+        fontscale.set(50)
+        fontscale.bind("<ButtonRelease-1>",lambda x: self.UpdateStandaloneClock(clocklabel, fontscale))
+        clocklabel.after(100, self.UpdateBoiniClock(clocklabel))
+
+    def UpdateStandaloneClock(self, clocklabel, fontscale):
+        clocklabel.config(font=("TkDefaultFont", fontscale.get(), "bold"))
+
     def AddPersonalInfo(self):
 
         Register_window = tix.Toplevel(self.master)
@@ -224,23 +255,77 @@ class SeasonInfoScreen(Frame):
         Register_window = tix.Toplevel(self.master)
         Register_window.grab_set()
         Register_window.resizable(0, 0)
-        clocklabel =  Label(Register_window,text="현재시간: %d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute,datetime.datetime.now().second))
+        clocklabel =  Label(Register_window,text="현재 이 컴퓨터의 시간: %s:%s:%s"%(str(datetime.datetime.now().hour).rjust(2,"0"), str(datetime.datetime.now().minute).rjust(2,"0"),str(datetime.datetime.now().second).rjust(2,"0")))
+        boini_clock_label = Label(Register_window,text="현재 보인아이 홈페이지의 시간: (동기화 중...잠시만 기다려주세요)")
         clocklabel.grid(row=0,column=0,columnspan=2)
-        clocklabel.after(500, lambda: self.UpdateOnAutomateClock(clocklabel))
-        Label(Register_window,text="등록시작을 원하는 시간을 24시간:분:초 형식으로 입력해주세요\n(예:8시부터 신청을 원하면 20:0:0). 이 사간부터 프로그램은 될때까지 등록을 계속 합니다.").grid(row=1,column=0,columnspan=2)
-        Label(Register_window, text="시간(24시간 형식):분:초").grid(row=2, column=0)
+        boini_clock_label.grid(row=1, column=0, columnspan=2)
+        clocklabel.after(500, lambda: self.UpdateOnAutomateClock(clocklabel, True))
+        boini_clock_label.after(1000, lambda: self.GetServerTime(boini_clock_label))
+        Label(Register_window,text="등록시작을 원하는 시간을 현재 보인아이의 시간을 기준으로 24시간:분:초 형식으로 입력해주세요\n(예:8시부터 신청을 원하면 20:00:00). 이 사간부터 프로그램은 될때까지 등록을 계속 합니다.").grid(row=2,column=0,columnspan=2)
+        Label(Register_window, text="시간(24시간 형식):분:초").grid(row=3, column=0)
         timeentry = Entry(Register_window,textvariable=self.AutoRegisterInput)
-        timeentry.grid(row=2, column=1)
+        timeentry.grid(row=3, column=1)
         timeentry.bind("<KeyRelease>",self.OnAutomateCallBack)
         #Button(Register_window, text="설정하기", command= lambda: self.OnAutomateCallBack("event")).grid(row=3, column=0, columnspan=2)
         Label(Register_window, textvariable=self.AutoRegisterInfo).grid(row=4,column=0,columnspan=2)
         Button(Register_window, text="닫기", command=lambda: Register_window.destroy()).grid(row=5, column=0, columnspan=2)
 
-    def UpdateOnAutomateClock(self,labelwidget):
+    def UpdateBoiniClock(self, labelwidget, user_friendly=False):
         if labelwidget.winfo_exists():
-            labelwidget.config(text="%d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute,datetime.datetime.now().second))
-            self.master.update()
-            labelwidget.after(500, lambda: self.UpdateOnAutomateClock(labelwidget))
+            ct = datetime.datetime.now() - self.ServerTimeOffset
+            if user_friendly:
+                labelwidget.config(text="현재 보인아이 홈페이지의 시간: %s:%s:%s" % (
+                str(ct.hour).rjust(2, "0"), str(ct.minute).rjust(2, "0"), str(ct.second).rjust(2, "0")))
+            else:
+                labelwidget.config(text="%s:%s:%s" % (
+                    str(ct.hour).rjust(2, "0"), str(ct.minute).rjust(2, "0"), str(ct.second).rjust(2, "0")))
+            #self.master.update()
+            labelwidget.after(100, lambda: self.UpdateBoiniClock(labelwidget, user_friendly))
+
+    def SetServerTimeOffset(self):
+        starttime = time.time()
+        testreq = requests.get("http://boini.net")
+        endtime = time.time()
+        latency = round(endtime - starttime, 2)
+        self.RequestLatency.set(latency)
+        dateparam = testreq.headers["Date"]
+        dtval = datetime.datetime.strptime(dateparam, '%a, %d %b %Y %H:%M:%S GMT') + datetime.timedelta(0, 3600 * 9, 0)
+        server_time_with_latency = dtval + datetime.timedelta(0, latency, 0)
+        timediff = datetime.datetime.now() - server_time_with_latency
+        self.ServerTimeOffset = timediff
+
+    def GetServerTime(self, labelwidget):
+        if labelwidget.winfo_exists():
+            starttime = time.time()
+            testreq = requests.get("http://boini.net")
+            endtime = time.time()
+            latency = round(endtime-starttime, 2)
+            self.RequestLatency.set(latency)
+            dateparam = testreq.headers["Date"]
+            dtval = datetime.datetime.strptime(dateparam, '%a, %d %b %Y %H:%M:%S GMT') + datetime.timedelta(0,3600*9,0)
+            server_time_with_latency = dtval + datetime.timedelta(0, latency,0)
+            timediff = datetime.datetime.now() - server_time_with_latency
+            self.ServerTimeOffset = timediff
+            ct = datetime.datetime.now() - timediff
+            print("latency:",latency)
+            print("Date Header:", dateparam)
+            print("dtval:", dtval)
+            print("timediff:", timediff)
+            print("ct:", ct)
+            labelwidget.config(text="현재 보인아이 홈페이지의 시간: %s:%s:%s"%(str(ct.hour).rjust(2,"0"), str(ct.minute).rjust(2,"0"),str(ct.second).rjust(2,"0")))
+            #self.master.update()
+            labelwidget.after(100,lambda: self.UpdateBoiniClock(labelwidget, True))
+
+    def UpdateOnAutomateClock(self,labelwidget, user_friendly=False):
+        if labelwidget.winfo_exists():
+            if user_friendly:
+                labelwidget.config(text="현재 이 컴퓨터의 시간: %s:%s:%s"%(str(datetime.datetime.now().hour).rjust(2,"0"), str(datetime.datetime.now().minute).rjust(2,"0"),str(datetime.datetime.now().second).rjust(2,"0")))
+            else:
+                labelwidget.config(text="%s:%s:%s" % (
+                str(datetime.datetime.now().hour).rjust(2, "0"), str(datetime.datetime.now().minute).rjust(2, "0"),
+                str(datetime.datetime.now().second).rjust(2, "0")))
+            #self.master.update()
+            labelwidget.after(100, lambda: self.UpdateOnAutomateClock(labelwidget, user_friendly))
     def OnAutomateCallBack(self,event):
         self.master.update_idletasks()
         hourvar, minutevar, secondvar = IntVar(), IntVar(), IntVar()
@@ -251,10 +336,10 @@ class SeasonInfoScreen(Frame):
             self.AutoRegisterInfo.set("올바르지 않은 시간 형식입니다.")
         else:
             if hour.isdigit() and minute.isdigit() and second.isdigit():
-                newtime = datetime.datetime.now()
+                newtime = datetime.datetime.now() - self.ServerTimeOffset
                 newtime = newtime.replace(hour=int(hour),minute=int(minute),second=int(second))
 
-                offset = newtime - datetime.datetime.now()
+                offset = newtime - (datetime.datetime.now() - self.ServerTimeOffset)
                 offhours,r1 = divmod(offset.seconds,3600)
                 offminutes, offseconds = divmod(r1,60)
                 self.AutoRegisterInfo.set("시작시간: %s시 %s분 %s초 (%d시간 %d분 %d초 후) 으로 설정되었습니다."%(hour,minute,second,offhours,offminutes,offseconds))
@@ -280,7 +365,7 @@ class SeasonInfoScreen(Frame):
                         self.AutoRegisterClass_handler(Class_Tuple,class_info)
 
     def CheckAutoRegister(self,mainwindow, statuslabel, infotext, ctuple):
-        ctime = time.mktime(time.localtime(time.time()))
+        ctime = time.mktime((datetime.datetime.now()-self.ServerTimeOffset).timetuple())
         if mainwindow.winfo_exists():
             if ctime >= self.AutoRegisterTime.get():
                 statuslabel.config(text="신청중")
@@ -346,11 +431,11 @@ class SeasonInfoScreen(Frame):
         Waitwindow.protocol("WM_DELETE_WINDOW",lambda:self.OnAutoWindowClose(Waitwindow))
         Label(Waitwindow,text="강좌이름").grid(row=0,column=0)
         Label(Waitwindow,text=Class_Info[3]).grid(row=0,column=1)
-        Label(Waitwindow,text="현재시간").grid(row=1,column=0)
+        Label(Waitwindow,text="현재 보인아이 시간").grid(row=1,column=0)
         literal = "%d:%d:%d"%(datetime.datetime.now().hour, datetime.datetime.now().minute, datetime.datetime.now().second)
         clocklabel = Label(Waitwindow, text=literal)
         clocklabel.grid(row=1, column=1)
-        clocklabel.after(500, lambda: self.UpdateOnAutomateClock(clocklabel))
+        clocklabel.after(500, lambda: self.UpdateBoiniClock(clocklabel))
         Label(Waitwindow, text="자동신청 시간").grid(row=2,column=0)
         Label(Waitwindow, text="%s"%(time.strftime("%H:%M:%S",time.localtime(self.AutoRegisterTime.get())))).grid(row=2, column=1)
         Label(Waitwindow, text="상태").grid(row=3, column=0)
@@ -510,7 +595,7 @@ if __name__ == "__main__":
     root = tix.Tk()
     root.resizable(0,0)
     root.title("방과후등록을 편리하게~")
-    root.after(1000, change_title1)
+    #root.after(1000, change_title1)
     root.maxsize(root.winfo_screenwidth(),root.winfo_screenheight()-150)
     MyRequestHandler = BoinWebHandler()
 
