@@ -156,7 +156,7 @@ class SeasonInfoScreen(Frame):
             myMenu = Menu(self.master)
             myMenu.add_command(label="본인정보 등록",command=self.AddPersonalInfo)
             myMenu.add_command(label="자동등록 설정",command=self.OnAutomate)
-            myMenu.add_command(labe="존나 큰 시계보기",command=self.ShowClock)
+            myMenu.add_command(labe="큰 시계보기",command=self.ShowClock)
             self.Student_Name = StringVar()
             self.Student_ID = StringVar()
             self.AutoRegisterTime = IntVar()
